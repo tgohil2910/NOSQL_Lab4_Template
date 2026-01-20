@@ -1,0 +1,50 @@
+name: MongoDB Indexing Autograding
+
+on: [push]
+
+jobs:
+  grade:
+    runs-on: ubuntu-latest
+
+    services:
+      mongo:
+        image: mongo:6
+        ports:
+          - 27017:27017
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 1. Install MongoDB Shell (mongosh)
+      - name: Install MongoDB Shell
+        run: |
+          curl -fsSL https://pgp.mongodb.com/server-6.0.asc | \
+            sudo gpg --dearmor -o /usr/share/keyrings/mongodb-server-6.0.gpg
+          echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-6.0.gpg ] \
+            https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/6.0 multiverse" | \
+            sudo tee /etc/apt/sources.list.d/mongodb-org-6.0.list
+          sudo apt-get update
+          sudo apt-get install -y mongodb-mongosh
+
+      # 2. Setup Node.js for the grader script
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Initialize Node project
+        run: |
+          if [ ! -f package.json ]; then
+            npm init -y
+          fi
+          npm install mongodb
+
+      # 3. Run Student Solution
+      # We use '|| true' so the workflow proceeds to grading even if the script throws a minor error
+      - name: Run Student MongoDB Script
+        run: mongosh mongodb://localhost:27017 solution_indexing.mongodb || true
+
+      # 4. Run Autograder Logic
+      - name: Run Index Verifier
+        run: node verify_indexing.js
